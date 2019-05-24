@@ -1,1 +1,4 @@
 # Object Orientation Prediction By Using Synthetic Images for Training 
+Our goal is to detect the position and orientation of objects in pictures. Use cases for such an application is to give spatial aware- ness to automated systems as self driving cars, automatic vacuums, drones for local spatial navigation, or surveillance systems. Our strategy is to first generate multiple synthetic images of objects with known spatial information. We use these images to train a machine learning algorithm to predict the spatial data based on the synthetic images and predict the position and orientation of objects in real life images.
+
+We use Yolo for the object detection task and various Convolutional neural network (CNN) architectures for the regression task in estimating the object orientation. We generate our own synthetic images as training data using computer rendering. 
