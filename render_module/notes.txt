@@ -1,0 +1,88 @@
+
+Introduction
+	Arhictecture.
+Data/Rendering
+	Introduction
+		Architecture and interface.
+			We choose a library based code architecture where some higher level modules take use of lowe level modules as libraries. The lower level modules provides an interface to the higher level modules without knowledge of any of the functionality of the higher level modules. The higher level modules use the lower level modules only knowing its interface, but not knowing its inner functionality. The rendering module is such a lower level module. The module is placed in the render_module/ folder. The interface is documented in the "read_me.txt" file within this folder. As inner functionality of the render module changes, it is done so in an backwards compatible way. The read_me is updated to include the new functionality. This way, the higher modules using the render module, can take advantage of the new functionality at their own pace without their code breaking.
+		Obtaining the training data.
+			We choose to generate the training data ourself rather than downloading training data from online sources or taking pictures of objects in real life. The Advantage to generate our own data is that we can adjust the data generated to our own liking, and if we later change our minds, the parameter deciding how the training data is generated can quickly be changed and the data re-generated. Taking pictures of real life objects would take a long time to do and it would take just as long if we wanted to for example change the background, as we would have to take all the pictures again. Images downloaded online might not suit the imput images we would use our model for. Another advantage to generating our own data is we could generate as much data as we want, only having to balance overfitting against processing power required to train our model.
+			Justification
+			Quick adjust training data to real data. (Real chair)
+			Infinite training data.
+	Technology
+		To generate images efficiently, we wanted a rendering library that was both high performing, and one that gave us enough control over the rendering process to create training data that matches our needs.
+		webGL
+			WebGL is a web API based on OpenGL used on the web. This was the first rendering API considered as we already knew how to use it. Even tough webGL allow for both fast and customizable rendering, its interface with the other modules (object detection and orientation detection) would be more complicated. The initial idea was to run WebGL first to generate images, save these, and then use them for the training. Since the architecture of the render module should allow higher level modules to control the rendering of the images (like the field of view, lighting color...) we did not follow thourgh with this plan. Since the higher level modules are written in python and WebGL is a web interface, and alternative approach could be to create a web interface between the modules. We decided to instead look for a python based OpenGL interface instead, as that would be less complicated.
+			allow setting parameters of those above
+			opengl complicated, this faster
+		OpenGL, ModernGL
+			We first looked at PyOpenGL for python. This library is built on OpenGL, which is both simple and give us a good control over the rendering process. The problem is the package is a bit outdated, often depending on python 2. Also the OpenGL functionality taken use of was also outdated, somewhat limiting customization of the rendering. Performance would also be worse. We looked into moderngl instead. Moderngl is another OpenGL library that builds on OpenGL, has good performance, and gives a high control over the rendering. It also is a slightly simpler API than. Now as we have the tools to render our objects, we just need a way to model and load them.
+			Built on OpenGL
+			Easy, good control, adjust training data to test data.
+		Blender
+			Blender is a free open source 3d modeling program. We used this to create various models of chairs to be visualized using the rendering module. We took pictures of a real chair, and used the reference images to model the chair in blender. We took pictures of the surfaces of the chair in diffuse white light condition and used those images as textures. [figure_01] [figure_02].
+			intro
+				 free modelling software
+			Model real chair.
+		Rendering technical
+			The rendering pipeline consists of taking images of real chairs, these images are modeled in blender and saved as object files. The object files are then read by a custom object file reader in the render module (since none could be found online). The model data is sent to buffers (vertex and index buffers) in the graphics card together with a shader program. The shader progmram tells the graphics card how to interpet the vertex data in the vertex buffers. We implemented the pong lighting model as it is simple and gives good enough results for our purpose. The texture gives the color of the surface. The color and angle of the light coming from above decides the color and brightness of the light bouncing off the surface. For the chair model [see figure_01 and figure_02], the legs were challenging. The view and light reflection angle off the legs made the chairs sometimes more easy to spot, and sometimes more hard. Initially we made the legs grey, but this made the legs consistently easy to spot. To make the training data more similar to the real chair, specular mapping was introduced. This made the legs much more reflective, as can be seen in the image of the real chair [figure_01].
+			pipeline
+				blender->Object file->gpu buffer->shader program+transformation matrices+textures+light information->rendered image
+			specular mapping->face bump mapping
+		Challenges
+			Challenges introduction
+				One of the biggest challenges we faced, was that the training data had to be very similar to the real world images. The models usually had great success at fitting the training data, and the loss was even good on the generated test data, but not the real images. Even a small difference between the real and generated images, could throw the predictions way off. To combat this, we focused on making the generated data as similar to the training data as possible. To get the model more robust to differences in lighting, like white balance, we experimented with varying lighting conditions. Random noise was added for general robustness. We also randomized the light direction [ref rennys paper]. But the change that proved to give the best improvement was making the model size to image size match the training data more accurately.
+			Very similar!
+			Similar lighting
+				Learn from light direction?
+			Field of view
+				Matching test data
+			Light
+				random colors
+				random direction
+			Noise
+			Orientation describtion
+				There would not be much use of training data, if it was not labeled with ohe orientations of the rendered objects. For the orientations to be useful for the orientation prediction module, the ways of describing orientation must follow some criterias. One criteria is that the describtion of orientation must not be redundant, that is, there must not exist two descibtions describing the same orientation. If this were the case, the orientation prediction module, might predict the correct orientation, but since the describtion is different, the predition is assumed to be wrong. This excludes using euler angles, as it is redundant. Another problem with euler angles is gimbal lock, which brings us to the next criteria. Two orientations that are almost the same, must give the same values describing the orientation. This must be the case for the gradient descent to work while fitting the model. This rules out using quaternions. Qaternions are used internally to describe orientation while rendering the objects. A quaternion consists of 4 real numbers multiplied with some imaginary components. Our first approach was simply to use these 4 numbers as the orientation. The problem we found, was that almost two identical quaternion orientations could have very different values. This lead us to the final solution. We describe orientation using two vectors of 3 dimensions. This gives 6 values. We let the first vector be the forwards direction, the second vector be the uppwards direction. If the lengths of each of the vectors are 1, we satisfy the first criteria. Each orientation can only be described one way. The second criteria is also fulfilled, as slightly small differences in orientation will give small difference in the vectors positions and their coordinate values. Since the size of the vectors do not matter, we neet to resize the predictions to become unit vectors. From experimentation, the prediction gives very large vectors, so a potential problem of small vectors radically changing direction due to small displacements, will not occur. [other paper]
+				Azimuth
+					1, 3 degrees of freedom
+				Euler
+					gimbal lock
+				Quaternions
+					jumps
+				Vectors
+					more numbers, but smooth
+					normalizations, possible error when too small? (not really a problem as we see numbers are big). less complexity for the network resizing the vectors in the beginning.
+			Background
+				Initially we set the background of the generated images to be black. Since this might make the model unfit to deal with the noise that comes with a varying background, we rendered a box around the model. [figure_03]. The background has different colors and shapes. The orientation of the chair relative to the background is also randomized for each training image. In the process of making the training data even more similar to the real images, we also added a background made out of images taken of the surrondings of where the real chair would be located. [figure_04]. The background images are translated and rotated randomly for each training sample to maximize the use of the images.
+				Black background.
+				add Noise by building a room.
+					Colors not realisitc.
+					might filter away thos colors.
+				Random images of real background.
+					Adjust colors and lighting.
+					Rotating, translating images for best use of data.
+			Limiting of angle.
+				Optimizations.
+					To speed up the training process, the rendering module also support limiting of the angles of the images. It can be set to only show the models from above, or models that are never tilted more than 90 degrees. This limits what the orientation detection model can recognize, but also makes it better at the more limited problem for it to solve.
+				only from above, no roll beyond 90 degrees
+				Faster training
+				[Ref rennys paper] no rotation and more powerful computing power, 1 million training data
+			Field of view
+				Matching the testing data better
+	Extras
+
+	References:
+		https://stackoverflow.com/questions/1171849/finding-quaternion-representing-the-rotation-from-one-vector-to-another 2019 april 20.
+		https://www.scratchapixel.com/lessons/3d-basic-rendering/perspective-and-orthographic-projection-matrix/building-basic-perspective-projection-matrix 2019 april 20.
+Orientation Detection
+Object Detection
+Results
+
+
+
+
+
+
+
+
